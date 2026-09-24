@@ -148,11 +148,11 @@
 // ══════════════════════════════════════════════════════════════
 // CONFIGURATION — à compléter avant mise en ligne
 // ══════════════════════════════════════════════════════════════
-const PADDLE_ENV = 'sandbox';          // 'sandbox' en test, 'production' une fois prêt
-const PADDLE_CLIENT_TOKEN = 'REMPLACER_PAR_VOTRE_TOKEN_CLIENT_PADDLE'; // Paddle > Developer tools > Authentication
-const PADDLE_PRICE_ID = 'REMPLACER_PAR_VOTRE_PRICE_ID';                // pri_xxxxxxxx, depuis votre produit Paddle
+const PADDLE_ENV = 'production';       // token fourni = live_..., donc environnement production
+const PADDLE_CLIENT_TOKEN = 'live_5c568025ca4a8da40f294d248ed';
+const PADDLE_PRICE_ID = 'pri_01m39s2f4d7s8eprv776yghwm3';
 const STRIPE_PAYMENT_LINK_URL = 'REMPLACER_PAR_VOTRE_LIEN_STRIPE';     // ex. https://buy.stripe.com/xxxx — voir README pour l'URL de succès à configurer dessus
-const PRICE_DISPLAY = '—,-- €';        // à afficher (le prix réel est défini côté Stripe/Paddle)
+const PRICE_DISPLAY = '4,99 €';
 
 document.getElementById('price-display').textContent = PRICE_DISPLAY;
 
