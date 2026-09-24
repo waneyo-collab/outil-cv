@@ -1,0 +1,9 @@
+{
+  "name": "outil-cv",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Générateur de CV et lettre de motivation par IA (Waneyo Formation)",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.0.0"
+  }
+}

@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Générateur de CV & Lettre de Motivation par IA — Waneyo Formation</title>
+<meta name="description" content="Génère ton CV et ta lettre de motivation professionnels en quelques minutes, adaptés au marché de l'emploi de ton pays.">
+
+<script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/3.0.3/jspdf.umd.min.js"></script>
+
+<style>
+  :root{
+    --primary:#7C3AED; --primary-light:#EDE9FE; --dark:#0F0A1E;
+    --bg:#F9F7FF; --card:#fff; --text:#1E1B4B; --muted:#6B7280; --border:#E5E7EB;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',sans-serif}
+  body{background:var(--bg);color:var(--text);line-height:1.5}
+  .wrap{max-width:720px;margin:0 auto;padding:24px 20px 64px}
+  header.top{background:var(--dark);padding:18px 20px;text-align:center}
+  header.top .brand{color:#fff;font-weight:800;font-size:18px}
+  header.top .brand span{color:#FBBF24}
+  .view{display:none}
+  .view.active{display:block}
+  h1{font-size:26px;margin:24px 0 10px;color:var(--dark)}
+  h2{font-size:19px;margin:28px 0 10px;color:var(--dark)}
+  p.lead{color:var(--muted);font-size:15px;margin-bottom:18px}
+  .price-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;text-align:center;margin:20px 0;box-shadow:0 2px 10px rgba(0,0,0,.04)}
+  .price{font-size:38px;font-weight:800;color:var(--primary)}
+  .price small{font-size:14px;color:var(--muted);font-weight:400}
+  ul.features{list-style:none;text-align:left;margin:18px auto;max-width:420px}
+  ul.features li{padding:6px 0;font-size:14px;color:var(--text)}
+  ul.features li::before{content:"✅ ";margin-right:4px}
+  .btn{display:inline-block;background:var(--primary);color:#fff;border:none;border-radius:10px;padding:14px 28px;font-size:16px;font-weight:700;cursor:pointer;text-decoration:none}
+  .btn:hover{opacity:.92}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn-secondary{background:transparent;color:var(--primary);border:1px solid var(--primary)}
+  .field{margin-bottom:16px}
+  .field label{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--text)}
+  .field input, .field select, .field textarea{
+    width:100%;border:1px solid var(--border);border-radius:8px;padding:10px 12px;
+    font-size:14px;font-family:inherit;outline:none;background:var(--card);color:var(--text)
+  }
+  .field textarea{min-height:80px;resize:vertical}
+  .field .hint{font-size:12px;color:var(--muted);margin-top:4px}
+  .status-msg{background:var(--primary-light);color:var(--primary);border-radius:8px;padding:12px 14px;font-size:14px;margin:14px 0}
+  .error-msg{background:#FEF2F2;color:#B91C1C;border:1px solid #FCA5A5;border-radius:8px;padding:12px 14px;font-size:14px;margin:14px 0}
+  .result-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
+  .result-card h3{font-size:15px;color:var(--primary);margin-bottom:10px}
+  .exp-block{margin-bottom:14px}
+  .exp-block .poste{font-weight:700;font-size:14px}
+  .exp-block .periode{font-size:12px;color:var(--muted);margin-bottom:4px}
+  .exp-block ul{margin-left:18px;font-size:14px}
+  .tag-list{display:flex;flex-wrap:wrap;gap:6px}
+  .tag{background:var(--primary-light);color:var(--primary);font-size:12px;padding:4px 10px;border-radius:999px}
+  .letter-text{white-space:pre-wrap;font-size:14px;line-height:1.7}
+  .actions-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+  footer{text-align:center;color:var(--muted);font-size:12px;padding:24px 0}
+</style>
+</head>
+<body>
+
+<header class="top"><div class="brand">Waneyo <span>Formation</span> — Outil CV</div></header>
+
+<div class="wrap">
+
+  <!-- ═══════════ VUE 1 : OFFRE ═══════════ -->
+  <div class="view active" id="view-landing">
+    <h1>Ton CV et ta lettre de motivation, prêts en quelques minutes</h1>
+    <p class="lead">Générés par IA à partir de ton parcours réel, adaptés aux usages RH de ton pays cible (Maroc, France, Canada, Afrique francophone).</p>
+
+    <div class="price-card">
+      <div class="price" id="price-display">—</div>
+      <ul class="features">
+        <li>CV structuré, verbes d'action, prêt à l'emploi</li>
+        <li>Lettre de motivation personnalisée (250–350 mots)</li>
+        <li>Adapté aux codes RH de ton pays cible</li>
+        <li>Téléchargement PDF immédiat</li>
+      </ul>
+      <button class="btn" id="btn-order">Commander maintenant</button>
+    </div>
+
+    <div id="landing-error"></div>
+  </div>
+
+  <!-- ═══════════ VUE 2 : FORMULAIRE PROFIL (après paiement) ═══════════ -->
+  <div class="view" id="view-form">
+    <h1>Paiement confirmé — parle-nous de toi</h1>
+    <p class="lead">Plus tu donnes de détails précis, meilleur sera le résultat. Rien n'est inventé : seules les informations que tu donnes ici sont utilisées.</p>
+
+    <form id="profile-form">
+      <div class="field">
+        <label for="f-nom">Nom complet</label>
+        <input type="text" id="f-nom" required maxlength="200">
+      </div>
+      <div class="field">
+        <label for="f-poste">Poste visé</label>
+        <input type="text" id="f-poste" required maxlength="200" placeholder="Ex. Chargé(e) de marketing digital">
+      </div>
+      <div class="field">
+        <label for="f-pays">Pays / marché cible</label>
+        <select id="f-pays" required>
+          <option value="">Choisir…</option>
+          <option value="Maroc">Maroc</option>
+          <option value="France">France</option>
+          <option value="Canada">Canada</option>
+          <option value="Afrique francophone (autre)">Afrique francophone (autre)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-experiences">Expériences professionnelles</label>
+        <textarea id="f-experiences" required maxlength="1500" placeholder="Liste tes expériences : poste, entreprise, période, ce que tu as fait concrètement…"></textarea>
+        <div class="hint">Écris librement, l'IA reformule et structure — n'invente rien de ton côté non plus, seul ce que tu écris ici sera utilisé.</div>
+      </div>
+      <div class="field">
+        <label for="f-formation">Formation</label>
+        <textarea id="f-formation" required maxlength="1500" placeholder="Diplômes, écoles, années…"></textarea>
+      </div>
+      <div class="field">
+        <label for="f-competences">Compétences</label>
+        <textarea id="f-competences" required maxlength="1500" placeholder="Techniques et humaines, en vrac"></textarea>
+      </div>
+      <div class="field">
+        <label for="f-langues">Langues</label>
+        <input type="text" id="f-langues" required maxlength="300" placeholder="Ex. Français (natif), Arabe (natif), Anglais (courant)">
+      </div>
+
+      <button type="submit" class="btn" id="btn-generate" style="width:100%">Générer mon CV et ma lettre</button>
+    </form>
+
+    <div id="form-status"></div>
+  </div>
+
+  <!-- ═══════════ VUE 3 : RÉSULTAT ═══════════ -->
+  <div class="view" id="view-result">
+    <h1>C'est prêt 🎉</h1>
+    <div id="result-content"></div>
+    <div class="actions-row">
+      <button class="btn" id="btn-download-pdf">📄 Télécharger en PDF</button>
+    </div>
+  </div>
+
+</div>
+
+<footer>Waneyo Formation — L'Accélérateur Digital</footer>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// CONFIGURATION — à compléter avant mise en ligne
+// ══════════════════════════════════════════════════════════════
+const PADDLE_ENV = 'sandbox';          // 'sandbox' en test, 'production' une fois prêt
+const PADDLE_CLIENT_TOKEN = 'REMPLACER_PAR_VOTRE_TOKEN_CLIENT_PADDLE'; // Paddle > Developer tools > Authentication
+const PADDLE_PRICE_ID = 'REMPLACER_PAR_VOTRE_PRICE_ID';                // pri_xxxxxxxx, depuis votre produit Paddle
+const PRICE_DISPLAY = '—,-- €';        // à afficher (le prix réel est défini côté Paddle)
+
+document.getElementById('price-display').textContent = PRICE_DISPLAY;
+
+// ══════════════════════════════════════════════════════════════
+// Navigation entre les 3 vues
+// ══════════════════════════════════════════════════════════════
+function showView(id) {
+  document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
+  document.getElementById('view-' + id).classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+// ══════════════════════════════════════════════════════════════
+// Paddle : initialisation + ouverture du checkout
+// ══════════════════════════════════════════════════════════════
+let currentTransactionId = localStorage.getItem('cv_tx_id') || null;
+if (currentTransactionId) showView('form'); // reprise après un éventuel rechargement de page
+
+Paddle.Environment.set(PADDLE_ENV);
+Paddle.Initialize({
+  token: PADDLE_CLIENT_TOKEN,
+  eventCallback: function (evt) {
+    if (evt.name === 'checkout.completed') {
+      currentTransactionId = evt.data?.transaction_id || evt.data?.id || null;
+      if (currentTransactionId) localStorage.setItem('cv_tx_id', currentTransactionId);
+      showView('form');
+    }
+  },
+});
+
+document.getElementById('btn-order').addEventListener('click', function () {
+  const errBox = document.getElementById('landing-error');
+  errBox.innerHTML = '';
+  if (PADDLE_CLIENT_TOKEN.startsWith('REMPLACER') || PADDLE_PRICE_ID.startsWith('REMPLACER')) {
+    errBox.innerHTML = '<div class="error-msg">Configuration Paddle non renseignée (token client / price ID) — voir README.md.</div>';
+    return;
+  }
+  Paddle.Checkout.open({ items: [{ priceId: PADDLE_PRICE_ID, quantity: 1 }] });
+});
+
+// ══════════════════════════════════════════════════════════════
+// Formulaire profil -> génération (avec nouvelle tentative si la
+// commande n'est pas encore visible côté serveur : le webhook Paddle
+// peut arriver quelques secondes après la fin du paiement)
+// ══════════════════════════════════════════════════════════════
+const MAX_ATTEMPTS = 6;
+const RETRY_DELAY_MS = 1500;
+
+document.getElementById('profile-form').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  const btn = document.getElementById('btn-generate');
+  const statusBox = document.getElementById('form-status');
+  btn.disabled = true;
+  statusBox.innerHTML = '<div class="status-msg">Génération en cours…</div>';
+
+  const profile = {
+    nom: document.getElementById('f-nom').value.trim(),
+    poste: document.getElementById('f-poste').value.trim(),
+    pays: document.getElementById('f-pays').value,
+    experiences: document.getElementById('f-experiences').value.trim(),
+    formation: document.getElementById('f-formation').value.trim(),
+    competences: document.getElementById('f-competences').value.trim(),
+    langues: document.getElementById('f-langues').value.trim(),
+  };
+
+  try {
+    const result = await generateWithRetry(currentTransactionId, profile, 1);
+    localStorage.removeItem('cv_tx_id'); // commande consommée avec succès
+    lastResult = result;
+    renderResult(result);
+    showView('result');
+  } catch (err) {
+    statusBox.innerHTML = '<div class="error-msg">' + escapeHtml(err.message) + '</div>';
+    btn.disabled = false;
+  }
+});
+
+async function generateWithRetry(transactionId, profile, attempt) {
+  const statusBox = document.getElementById('form-status');
+  const res = await fetch('/.netlify/functions/generate-cv', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ transaction_id: transactionId, profile }),
+  });
+  const data = await res.json().catch(() => ({}));
+
+  if (res.ok) return data;
+
+  // 402 "Commande introuvable" juste après paiement = webhook pas encore arrivé -> on patiente
+  if (res.status === 402 && attempt < MAX_ATTEMPTS) {
+    statusBox.innerHTML = '<div class="status-msg">Finalisation du paiement… (' + attempt + '/' + MAX_ATTEMPTS + ')</div>';
+    await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+    return generateWithRetry(transactionId, profile, attempt + 1);
+  }
+
+  throw new Error(data.error || 'Une erreur est survenue. Contacte le support si le problème persiste.');
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ══════════════════════════════════════════════════════════════
+// Affichage du résultat
+// ══════════════════════════════════════════════════════════════
+let lastResult = null;
+
+function renderResult(data) {
+  const cv = data.cv || {};
+  const box = document.getElementById('result-content');
+
+  const expHtml = (cv.experiences || []).map((exp) => `
+    <div class="exp-block">
+      <div class="poste">${escapeHtml(exp.poste || '')}</div>
+      <div class="periode">${escapeHtml(exp.entreprise_periode || '')}</div>
+      <ul>${(exp.bullets || []).map((b) => `<li>${escapeHtml(b)}</li>`).join('')}</ul>
+    </div>
+  `).join('');
+
+  const tagList = (arr) => `<div class="tag-list">${(arr || []).map((x) => `<span class="tag">${escapeHtml(x)}</span>`).join('')}</div>`;
+
+  box.innerHTML = `
+    <div class="result-card">
+      <h3>${escapeHtml(cv.titre_professionnel || '')}</h3>
+      ${expHtml}
+    </div>
+    <div class="result-card">
+      <h3>Formation</h3>
+      ${tagList(cv.formation)}
+    </div>
+    <div class="result-card">
+      <h3>Compétences</h3>
+      ${tagList(cv.competences)}
+    </div>
+    <div class="result-card">
+      <h3>Langues</h3>
+      ${tagList(cv.langues)}
+    </div>
+    <div class="result-card">
+      <h3>Lettre de motivation</h3>
+      <div class="letter-text">${escapeHtml(data.lettre_motivation || '')}</div>
+    </div>
+  `;
+}
+
+// ══════════════════════════════════════════════════════════════
+// Export PDF (jsPDF) — mise en page simple et lisible, compatible ATS
+// ══════════════════════════════════════════════════════════════
+document.getElementById('btn-download-pdf').addEventListener('click', function () {
+  if (!lastResult) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const margin = 48;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const maxWidth = pageWidth - margin * 2;
+  let y = margin;
+
+  function addLine(text, size, bold, gap) {
+    doc.setFontSize(size);
+    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    const lines = doc.splitTextToSize(text, maxWidth);
+    lines.forEach((line) => {
+      if (y > doc.internal.pageSize.getHeight() - margin) { doc.addPage(); y = margin; }
+      doc.text(line, margin, y);
+      y += size * 1.35;
+    });
+    y += gap || 0;
+  }
+
+  const cv = lastResult.cv || {};
+  addLine(cv.titre_professionnel || 'CV', 18, true, 10);
+
+  (cv.experiences || []).forEach((exp) => {
+    addLine(exp.poste || '', 12, true, 0);
+    addLine(exp.entreprise_periode || '', 10, false, 4);
+    (exp.bullets || []).forEach((b) => addLine('• ' + b, 10, false, 0));
+    y += 8;
+  });
+
+  addLine('Formation', 13, true, 4);
+  addLine((cv.formation || []).join(' · '), 10, false, 10);
+
+  addLine('Compétences', 13, true, 4);
+  addLine((cv.competences || []).join(' · '), 10, false, 10);
+
+  addLine('Langues', 13, true, 4);
+  addLine((cv.langues || []).join(' · '), 10, false, 14);
+
+  doc.addPage();
+  y = margin;
+  addLine('Lettre de motivation', 15, true, 12);
+  addLine(lastResult.lettre_motivation || '', 11, false, 0);
+
+  doc.save('CV-et-lettre-de-motivation.pdf');
+});
+</script>
+</body>
+</html>
