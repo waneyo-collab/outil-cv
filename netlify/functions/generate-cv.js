@@ -94,7 +94,10 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers: CORS_HEADERS, body: JSON.stringify({ error: 'JSON invalide' }) };
   }
 
-  const { transaction_id, profile } = body;
+  const { provider, transaction_id, profile } = body;
+  if (!provider || !['paddle', 'stripe'].includes(provider)) {
+    return { statusCode: 400, headers: CORS_HEADERS, body: JSON.stringify({ error: 'Moyen de paiement invalide' }) };
+  }
   if (!transaction_id || !profile) {
     return { statusCode: 400, headers: CORS_HEADERS, body: JSON.stringify({ error: 'Champs manquants' }) };
   }
@@ -103,7 +106,8 @@ exports.handler = async (event) => {
   const { data: order, error: fetchError } = await supabase
     .from('cv_orders')
     .select('id, status, used')
-    .eq('paddle_transaction_id', transaction_id)
+    .eq('provider', provider)
+    .eq('provider_transaction_id', transaction_id)
     .maybeSingle();
 
   if (fetchError || !order) {

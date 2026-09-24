@@ -88,11 +88,12 @@ exports.handler = async (event) => {
     .from('cv_orders')
     .upsert(
       {
-        paddle_transaction_id: transactionId,
+        provider: 'paddle',
+        provider_transaction_id: transactionId,
         customer_email: customerEmail,
         status: 'completed',
       },
-      { onConflict: 'paddle_transaction_id', ignoreDuplicates: false }
+      { onConflict: 'provider,provider_transaction_id', ignoreDuplicates: false }
     );
 
   if (error) {

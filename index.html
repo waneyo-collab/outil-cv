@@ -151,9 +151,19 @@
 const PADDLE_ENV = 'sandbox';          // 'sandbox' en test, 'production' une fois prêt
 const PADDLE_CLIENT_TOKEN = 'REMPLACER_PAR_VOTRE_TOKEN_CLIENT_PADDLE'; // Paddle > Developer tools > Authentication
 const PADDLE_PRICE_ID = 'REMPLACER_PAR_VOTRE_PRICE_ID';                // pri_xxxxxxxx, depuis votre produit Paddle
-const PRICE_DISPLAY = '—,-- €';        // à afficher (le prix réel est défini côté Paddle)
+const STRIPE_PAYMENT_LINK_URL = 'REMPLACER_PAR_VOTRE_LIEN_STRIPE';     // ex. https://buy.stripe.com/xxxx — voir README pour l'URL de succès à configurer dessus
+const PRICE_DISPLAY = '—,-- €';        // à afficher (le prix réel est défini côté Stripe/Paddle)
 
 document.getElementById('price-display').textContent = PRICE_DISPLAY;
+
+// Pays classés "Afrique" -> Paddle (meilleur support local, Merchant of
+// Record). Tout le reste (Europe, Amériques, etc.) -> Stripe. Même
+// principe que la géo-détection de app.waneyo-formation.com.
+const AFRICAN_COUNTRY_CODES = new Set([
+  'DZ','AO','BJ','BW','BF','BI','CV','CM','CF','TD','KM','CG','CD','CI','DJ','EG','GQ','ER',
+  'SZ','ET','GA','GM','GH','GN','GW','KE','LS','LR','LY','MG','MW','ML','MR','MU','YT','MA',
+  'MZ','NA','NE','NG','RE','RW','SH','ST','SN','SC','SL','SO','ZA','SS','SD','TZ','TG','TN','UG','EH','ZM','ZW',
+]);
 
 // ══════════════════════════════════════════════════════════════
 // Navigation entre les 3 vues
@@ -165,18 +175,54 @@ function showView(id) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// Paddle : initialisation + ouverture du checkout
+// État de la commande en cours (Stripe ou Paddle), avec reprise possible
+// après un rechargement de page accidentel.
 // ══════════════════════════════════════════════════════════════
 let currentTransactionId = localStorage.getItem('cv_tx_id') || null;
-if (currentTransactionId) showView('form'); // reprise après un éventuel rechargement de page
+let currentProvider = localStorage.getItem('cv_tx_provider') || null;
+let paymentRoute = 'paddle'; // valeur par défaut si la géo-détection échoue (Paddle fonctionne partout)
 
+function setOrder(provider, transactionId) {
+  currentProvider = provider;
+  currentTransactionId = transactionId;
+  localStorage.setItem('cv_tx_provider', provider);
+  localStorage.setItem('cv_tx_id', transactionId);
+}
+function clearOrder() {
+  localStorage.removeItem('cv_tx_id');
+  localStorage.removeItem('cv_tx_provider');
+}
+
+// Retour depuis Stripe (Payment Link redirigeant vers
+// ?session_id={CHECKOUT_SESSION_ID}) : priorité sur tout le reste.
+const returnedSessionId = new URLSearchParams(window.location.search).get('session_id');
+if (returnedSessionId) {
+  setOrder('stripe', returnedSessionId);
+  history.replaceState(null, '', window.location.pathname); // nettoie l'URL
+  showView('form');
+} else if (currentTransactionId) {
+  showView('form'); // reprise après un éventuel rechargement de page (Paddle ou Stripe)
+}
+
+// Géo-détection (best effort ; Paddle reste le repli si la requête échoue)
+fetch('/api/geo').then((r) => r.json()).then((data) => {
+  if (data.country && AFRICAN_COUNTRY_CODES.has(data.country)) {
+    paymentRoute = 'paddle';
+  } else {
+    paymentRoute = 'stripe';
+  }
+}).catch(() => { /* on garde le repli Paddle */ });
+
+// ══════════════════════════════════════════════════════════════
+// Paddle : initialisation (toujours faite, utilisée si paymentRoute==='paddle')
+// ══════════════════════════════════════════════════════════════
 Paddle.Environment.set(PADDLE_ENV);
 Paddle.Initialize({
   token: PADDLE_CLIENT_TOKEN,
   eventCallback: function (evt) {
     if (evt.name === 'checkout.completed') {
-      currentTransactionId = evt.data?.transaction_id || evt.data?.id || null;
-      if (currentTransactionId) localStorage.setItem('cv_tx_id', currentTransactionId);
+      const txId = evt.data?.transaction_id || evt.data?.id || null;
+      if (txId) setOrder('paddle', txId);
       showView('form');
     }
   },
@@ -185,6 +231,16 @@ Paddle.Initialize({
 document.getElementById('btn-order').addEventListener('click', function () {
   const errBox = document.getElementById('landing-error');
   errBox.innerHTML = '';
+
+  if (paymentRoute === 'stripe') {
+    if (STRIPE_PAYMENT_LINK_URL.startsWith('REMPLACER')) {
+      errBox.innerHTML = '<div class="error-msg">Lien de paiement Stripe non renseigné — voir README.md.</div>';
+      return;
+    }
+    window.location.href = STRIPE_PAYMENT_LINK_URL;
+    return;
+  }
+
   if (PADDLE_CLIENT_TOKEN.startsWith('REMPLACER') || PADDLE_PRICE_ID.startsWith('REMPLACER')) {
     errBox.innerHTML = '<div class="error-msg">Configuration Paddle non renseignée (token client / price ID) — voir README.md.</div>';
     return;
@@ -218,8 +274,8 @@ document.getElementById('profile-form').addEventListener('submit', async functio
   };
 
   try {
-    const result = await generateWithRetry(currentTransactionId, profile, 1);
-    localStorage.removeItem('cv_tx_id'); // commande consommée avec succès
+    const result = await generateWithRetry(currentProvider, currentTransactionId, profile, 1);
+    clearOrder(); // commande consommée avec succès
     lastResult = result;
     renderResult(result);
     showView('result');
@@ -229,12 +285,12 @@ document.getElementById('profile-form').addEventListener('submit', async functio
   }
 });
 
-async function generateWithRetry(transactionId, profile, attempt) {
+async function generateWithRetry(provider, transactionId, profile, attempt) {
   const statusBox = document.getElementById('form-status');
   const res = await fetch('/.netlify/functions/generate-cv', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ transaction_id: transactionId, profile }),
+    body: JSON.stringify({ provider, transaction_id: transactionId, profile }),
   });
   const data = await res.json().catch(() => ({}));
 
@@ -244,7 +300,7 @@ async function generateWithRetry(transactionId, profile, attempt) {
   if (res.status === 402 && attempt < MAX_ATTEMPTS) {
     statusBox.innerHTML = '<div class="status-msg">Finalisation du paiement… (' + attempt + '/' + MAX_ATTEMPTS + ')</div>';
     await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
-    return generateWithRetry(transactionId, profile, attempt + 1);
+    return generateWithRetry(provider, transactionId, profile, attempt + 1);
   }
 
   throw new Error(data.error || 'Une erreur est survenue. Contacte le support si le problème persiste.');

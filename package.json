@@ -4,6 +4,7 @@
   "private": true,
   "description": "Générateur de CV et lettre de motivation par IA (Waneyo Formation)",
   "dependencies": {
-    "@supabase/supabase-js": "^2.0.0"
+    "@supabase/supabase-js": "^2.0.0",
+    "stripe": "^17.0.0"
   }
 }
