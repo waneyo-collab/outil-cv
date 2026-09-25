@@ -2,9 +2,5 @@
   publish = "."
   functions = "netlify/functions"
 
-[[edge_functions]]
-  path = "/api/geo"
-  function = "geo"
-
 [secrets_scanning]
   omit_paths = ["index.html"]

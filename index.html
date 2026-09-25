@@ -6,7 +6,6 @@
 <title>Générateur de CV & Lettre de Motivation par IA — Waneyo Formation</title>
 <meta name="description" content="Génère ton CV et ta lettre de motivation professionnels en quelques minutes, adaptés au marché de l'emploi de ton pays.">
 
-<script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/3.0.3/jspdf.umd.min.js"></script>
 
 <style>
@@ -148,22 +147,10 @@
 // ══════════════════════════════════════════════════════════════
 // CONFIGURATION — à compléter avant mise en ligne
 // ══════════════════════════════════════════════════════════════
-const PADDLE_ENV = 'production';       // token fourni = live_..., donc environnement production
-const PADDLE_CLIENT_TOKEN = 'live_5c568025ca4a8da40f294d248ed';
-const PADDLE_PRICE_ID = 'pri_01m39s2f4d7s8eprv776yghwm3';
 const STRIPE_PAYMENT_LINK_URL = 'https://buy.stripe.com/fZu7sMfb9eUja9QeKk43S03';
 const PRICE_DISPLAY = '4,99 €';
 
 document.getElementById('price-display').textContent = PRICE_DISPLAY;
-
-// Pays classés "Afrique" -> Paddle (meilleur support local, Merchant of
-// Record). Tout le reste (Europe, Amériques, etc.) -> Stripe. Même
-// principe que la géo-détection de app.waneyo-formation.com.
-const AFRICAN_COUNTRY_CODES = new Set([
-  'DZ','AO','BJ','BW','BF','BI','CV','CM','CF','TD','KM','CG','CD','CI','DJ','EG','GQ','ER',
-  'SZ','ET','GA','GM','GH','GN','GW','KE','LS','LR','LY','MG','MW','ML','MR','MU','YT','MA',
-  'MZ','NA','NE','NG','RE','RW','SH','ST','SN','SC','SL','SO','ZA','SS','SD','TZ','TG','TN','UG','EH','ZM','ZW',
-]);
 
 // ══════════════════════════════════════════════════════════════
 // Navigation entre les 3 vues
@@ -175,82 +162,47 @@ function showView(id) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// État de la commande en cours (Stripe ou Paddle), avec reprise possible
-// après un rechargement de page accidentel.
+// État de la commande en cours, avec reprise possible après un
+// rechargement de page accidentel. `provider` reste 'stripe' pour
+// l'instant (structure conservée au cas où un second moyen de paiement
+// serait réintroduit plus tard — aucune conséquence tant qu'un seul est
+// utilisé).
 // ══════════════════════════════════════════════════════════════
+const PROVIDER = 'stripe';
 let currentTransactionId = localStorage.getItem('cv_tx_id') || null;
-let currentProvider = localStorage.getItem('cv_tx_provider') || null;
-let paymentRoute = 'paddle'; // valeur par défaut si la géo-détection échoue (Paddle fonctionne partout)
 
-function setOrder(provider, transactionId) {
-  currentProvider = provider;
+function setOrder(transactionId) {
   currentTransactionId = transactionId;
-  localStorage.setItem('cv_tx_provider', provider);
   localStorage.setItem('cv_tx_id', transactionId);
 }
 function clearOrder() {
   localStorage.removeItem('cv_tx_id');
-  localStorage.removeItem('cv_tx_provider');
 }
 
 // Retour depuis Stripe (Payment Link redirigeant vers
 // ?session_id={CHECKOUT_SESSION_ID}) : priorité sur tout le reste.
 const returnedSessionId = new URLSearchParams(window.location.search).get('session_id');
 if (returnedSessionId) {
-  setOrder('stripe', returnedSessionId);
+  setOrder(returnedSessionId);
   history.replaceState(null, '', window.location.pathname); // nettoie l'URL
   showView('form');
 } else if (currentTransactionId) {
-  showView('form'); // reprise après un éventuel rechargement de page (Paddle ou Stripe)
+  showView('form'); // reprise après un éventuel rechargement de page
 }
-
-// Géo-détection (best effort ; Paddle reste le repli si la requête échoue)
-fetch('/api/geo').then((r) => r.json()).then((data) => {
-  if (data.country && AFRICAN_COUNTRY_CODES.has(data.country)) {
-    paymentRoute = 'paddle';
-  } else {
-    paymentRoute = 'stripe';
-  }
-}).catch(() => { /* on garde le repli Paddle */ });
-
-// ══════════════════════════════════════════════════════════════
-// Paddle : initialisation (toujours faite, utilisée si paymentRoute==='paddle')
-// ══════════════════════════════════════════════════════════════
-Paddle.Environment.set(PADDLE_ENV);
-Paddle.Initialize({
-  token: PADDLE_CLIENT_TOKEN,
-  eventCallback: function (evt) {
-    if (evt.name === 'checkout.completed') {
-      const txId = evt.data?.transaction_id || evt.data?.id || null;
-      if (txId) setOrder('paddle', txId);
-      showView('form');
-    }
-  },
-});
 
 document.getElementById('btn-order').addEventListener('click', function () {
   const errBox = document.getElementById('landing-error');
   errBox.innerHTML = '';
-
-  if (paymentRoute === 'stripe') {
-    if (STRIPE_PAYMENT_LINK_URL.startsWith('REMPLACER')) {
-      errBox.innerHTML = '<div class="error-msg">Lien de paiement Stripe non renseigné — voir README.md.</div>';
-      return;
-    }
-    window.location.href = STRIPE_PAYMENT_LINK_URL;
+  if (STRIPE_PAYMENT_LINK_URL.startsWith('REMPLACER')) {
+    errBox.innerHTML = '<div class="error-msg">Lien de paiement Stripe non renseigné — voir README.md.</div>';
     return;
   }
-
-  if (PADDLE_CLIENT_TOKEN.startsWith('REMPLACER') || PADDLE_PRICE_ID.startsWith('REMPLACER')) {
-    errBox.innerHTML = '<div class="error-msg">Configuration Paddle non renseignée (token client / price ID) — voir README.md.</div>';
-    return;
-  }
-  Paddle.Checkout.open({ items: [{ priceId: PADDLE_PRICE_ID, quantity: 1 }] });
+  window.location.href = STRIPE_PAYMENT_LINK_URL;
 });
 
 // ══════════════════════════════════════════════════════════════
 // Formulaire profil -> génération (avec nouvelle tentative si la
-// commande n'est pas encore visible côté serveur : le webhook Paddle
+// commande n'est pas encore visible côté serveur : le webhook Stripe
 // peut arriver quelques secondes après la fin du paiement)
 // ══════════════════════════════════════════════════════════════
 const MAX_ATTEMPTS = 6;
@@ -274,7 +226,7 @@ document.getElementById('profile-form').addEventListener('submit', async functio
   };
 
   try {
-    const result = await generateWithRetry(currentProvider, currentTransactionId, profile, 1);
+    const result = await generateWithRetry(PROVIDER, currentTransactionId, profile, 1);
     clearOrder(); // commande consommée avec succès
     lastResult = result;
     renderResult(result);

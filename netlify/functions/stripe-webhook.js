@@ -30,9 +30,8 @@ exports.handler = async (event) => {
   let stripeEvent;
   try {
     // constructEvent vérifie la signature (HMAC-SHA256 sur "<ts>.<corps>",
-    // en-tête Stripe-Signature) et la fraîcheur du timestamp — pas besoin
-    // de réimplémenter cette logique nous-mêmes, contrairement à Paddle
-    // qui n'a pas de SDK léger équivalent.
+    // en-tête Stripe-Signature) et la fraîcheur du timestamp — le SDK
+    // officiel Stripe gère ça pour nous, pas besoin de réimplémenter.
     stripeEvent = stripe.webhooks.constructEvent(rawBody, signature, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
     console.error('❌ Signature Stripe invalide:', err.message);
@@ -52,7 +51,7 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: 'Payload invalide' };
   }
 
-  // Upsert idempotent, même logique que paddle-webhook.js : Stripe peut
+  // Upsert idempotent : Stripe peut
   // renvoyer le même événement plusieurs fois, et on ne doit jamais
   // réinitialiser `used` si la commande a déjà été consommée.
   const { error } = await supabase
